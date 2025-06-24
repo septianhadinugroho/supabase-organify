@@ -1,8 +1,14 @@
+// server.js (Perbaikan)
+
 require('dotenv').config();
 const Hapi = require('@hapi/hapi');
-const { createClient } = require('@supabase/supabase-js');
 const routes = require('./routes');
 const userRoutes = require('./routes/userRoutes');
+
+const Inert = require('@hapi/inert');
+const Vision = require('@hapi/vision');
+const HapiSwagger = require('hapi-swagger');
+const Pkg = require('./package.json');
 
 // Fungsi validasi untuk strategi otentikasi Hapi
 const validateSupabaseJwt = async (decoded, request, h) => {
@@ -13,8 +19,7 @@ const validateSupabaseJwt = async (decoded, request, h) => {
   const token = authHeader.replace('Bearer ', '');
 
   try {
-    // Verifikasi token menggunakan Supabase Auth
-    // Inisialisasi client di sini untuk memastikan token dari header digunakan
+    const { createClient } = require('@supabase/supabase-js');
     const { data: { user }, error } = await createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
         global: { headers: { Authorization: `Bearer ${token}` } }
     }).auth.getUser();
@@ -23,7 +28,6 @@ const validateSupabaseJwt = async (decoded, request, h) => {
       return { isValid: false };
     }
 
-    // Jika valid, teruskan informasi user ke handler
     return {
       isValid: true,
       credentials: {
@@ -44,26 +48,51 @@ const init = async () => {
     host: process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost',
     routes: {
       cors: {
-        origin: ['*'], // Di produksi, lebih baik spesifik, misal: ['https://app-anda.com']
+        origin: ['*'],
       },
     },
   });
 
-  await server.register(require('@hapi/jwt'));
+  const swaggerOptions = {
+    info: {
+      title: 'Organify API Documentation',
+      version: Pkg.version,
+      description: 'Selamat datang di Organify API! Ini adalah backend service yang dibangun menggunakan Hapi.js dan terintegrasi dengan Supabase untuk menyediakan fungsionalitas aplikasi to-do list.'
+    },
+    securityDefinitions: {
+      'supabase_jwt': {
+        type: 'apiKey',
+        name: 'Authorization',
+        in: 'header',
+        description: "Masukkan token JWT dengan format 'Bearer {token}'"
+      }
+    },
+    security: [{ 'supabase_jwt': [] }]
+  };
 
-  // Konfigurasi strategi otentikasi 'supabase_jwt'
+  // --- PERUBAIKAN DI SINI ---
+  await server.register([
+    Inert,
+    Vision,
+    require('@hapi/jwt'), // Diubah dari string menjadi require()
+    {
+      plugin: HapiSwagger,
+      options: swaggerOptions
+    }
+  ]);
+  // -------------------------
+
   server.auth.strategy('supabase_jwt', 'jwt', {
     keys: process.env.SUPABASE_JWT_SECRET,
     verify: {
-      aud: false, // Jangan validasi audience di sini
-      iss: false, // Jangan validasi issuer di sini
-      sub: false, // Jangan validasi subject di sini
-      exp: true   // TETAP validasi expiration time (penting!)
+      aud: false,
+      iss: false,
+      sub: false,
+      exp: true
     },
-    validate: validateSupabaseJwt, // Fungsi kustom kita akan validasi sisanya
+    validate: validateSupabaseJwt,
   });
 
-  // Jadikan 'supabase_jwt' sebagai strategi default
   server.auth.default('supabase_jwt');
 
   server.route([...routes, ...userRoutes]);
@@ -74,11 +103,12 @@ const init = async () => {
     handler: (request, h) => {
       return 'Organify API with Supabase';
     },
-    options: { auth: false } // Rute ini tidak memerlukan otentikasi
+    options: { auth: false }
   });
 
   await server.start();
   console.log('Server running on %s', server.info.uri);
+  console.log('API documentation available at: %s/documentation', server.info.uri);
 };
 
 process.on('unhandledRejection', (err) => {
