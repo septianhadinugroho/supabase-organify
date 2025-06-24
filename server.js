@@ -92,6 +92,19 @@ const init = async () => {
 
   server.auth.default('supabase_jwt');
 
+  server.route({
+    method: 'GET',
+    path: '/swaggerui/{param*}',
+    handler: {
+      directory: {
+        path: require('path').join(__dirname, 'node_modules/swagger-ui-dist'),
+      },
+    },
+    options: {
+      auth: false,
+    },
+  });
+
   server.route([...routes, ...userRoutes]);
 
   server.route({
