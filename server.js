@@ -1,5 +1,3 @@
-// server.js (Perbaikan)
-
 require('dotenv').config();
 const Hapi = require('@hapi/hapi');
 const routes = require('./routes');
@@ -10,7 +8,6 @@ const Vision = require('@hapi/vision');
 const HapiSwagger = require('hapi-swagger');
 const Pkg = require('./package.json');
 
-// Fungsi validasi untuk strategi otentikasi Hapi
 const validateSupabaseJwt = async (decoded, request, h) => {
   const authHeader = request.headers.authorization;
   if (!authHeader) {
@@ -42,6 +39,7 @@ const validateSupabaseJwt = async (decoded, request, h) => {
   }
 };
 
+
 const init = async () => {
   const server = Hapi.server({
     port: process.env.PORT || 3001,
@@ -59,6 +57,7 @@ const init = async () => {
       version: Pkg.version,
       description: 'Selamat datang di Organify API! Ini adalah backend service yang dibangun menggunakan Hapi.js dan terintegrasi dengan Supabase untuk menyediakan fungsionalitas aplikasi to-do list.'
     },
+    host: `localhost:${process.env.PORT || 3001}`,
     securityDefinitions: {
       'supabase_jwt': {
         type: 'apiKey',
@@ -70,17 +69,15 @@ const init = async () => {
     security: [{ 'supabase_jwt': [] }]
   };
 
-  // --- PERUBAIKAN DI SINI ---
   await server.register([
     Inert,
     Vision,
-    require('@hapi/jwt'), // Diubah dari string menjadi require()
+    require('@hapi/jwt'),
     {
       plugin: HapiSwagger,
       options: swaggerOptions
     }
   ]);
-  // -------------------------
 
   server.auth.strategy('supabase_jwt', 'jwt', {
     keys: process.env.SUPABASE_JWT_SECRET,
